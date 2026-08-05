@@ -34,6 +34,7 @@ lagrange <- function(coefs, A, b) {
 # S will have levels 1,2,3,4
 # Sample data
 make_dummies <- function(S) {
+  # dummy variables based on levels of S.
   S_vals <- unique(S)
   S_mat <- matrix(0, nrow = length(S), ncol = length(S_vals))
   
@@ -41,19 +42,20 @@ make_dummies <- function(S) {
     S_mat[, i] <- as.numeric(S == S_vals[i])
   }
   
-  colnames(S_mat) <- as.character(S_vals)  # optional, but nice for interpretability
+  colnames(S_mat) <- as.character(S_vals)  
   return(S_mat)
 }
 
 esteq_pate <- function(S, X, Y, Z, weights, base_weights, tau) {
-  S_mat <- make_dummies(S)
   
+  S_mat <- make_dummies(S)
+  eq <- matrix(nrow = 3, ncol = ncol(S_mat))
   for (i in ncol(S_mat)) {
     eq1 <- S_mat[, i]*Z*weights*X - (1 - S_mat[, i])*base_weights*X
     eq2 <- S_mat[, i]*(1 - Z)*weights*X - (1 - S_mat[, i])*base_weights*X
     eq3 <- S_mat[, i]*weights*(Z*(Y - tau) - (1 - Z)*Y)
     
-    eq <- c(eq1, eq2, eq3) 
+    eq[, i] <- c(eq1, eq2, eq3) 
   }
   return(eq)
   
@@ -70,11 +72,15 @@ esteq_pate <- function(S, X, Y, Z, weights, base_weights, tau) {
 # }
 
 esteq_pate_mom <- function(S, X, Y, Z, weights, base_weights, tau) {
+  S_mat <- make_dummies(S)
+  eq <- matrix(nrow = 2, ncol = ncol(S_mat))
+  for (i in ncol(S_mat)) {
+    eq1 <- S_mat[, i]*weights*X - (1 - S_mat[, i])*base_weights*X
+    eq2 <- S_mat[, i]*weights*(Z*(Y - tau) - (1 - Z)*Y)
+    eq[, i] <- c(eq1, eq2) 
+  }
   
-  eq1 <- S*weights*X - (1 - S)*base_weights*X
-  eq2 <- S*weights*(Z*(Y - tau) - (1 - Z)*Y)
   
-  eq <- c(eq1, eq2) 
   return(eq)
   
 }
