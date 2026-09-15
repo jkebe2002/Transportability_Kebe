@@ -125,14 +125,24 @@ calibrate <- function(X, Z, target, mom = FALSE, optim_ctrl = list(maxit = 500, 
     b <- c(n_1*target, 0)
     
   } else {
+    # S goes here 
+    # This Z is a subset aka S * Z already
+    A <- cbind(S_mat[, 1]*Z*X, S_mat[, 1]*(1 - Z)*X)
     
-    A <- cbind(Z*X, (1 - Z)*X)
-    b <- c(n_1*target, n_1*target)
+    for (i in 2:ncol(S_mat)) {
+      A <- cbind(A, S_mat[, i]*Z*X, S_mat[, i]*(1 - Z)*X)
+    }
+    b <- unlist(lapply(seq_len(ncol(S_mat)), function(i) {
+      c(n1_vec[i] * target_mat[i, ],   # Z = 1 block, stratum i
+        n0_vec[i] * target_mat[i, ])   # Z = 0 block, stratum i
+    }))
     
   }
   
   # initialize coefs
   coefs_init <- rep(0, times = ncol(A))
+  
+  #This prob needs modified for multiple cases
   opt <- stats::optim(coefs_init, fn, method = "BFGS",
                       A = A, b = b, control = optim_ctrl)
   

@@ -1,0 +1,4 @@
+Code for transportability projects related to Jacob Kebe's work at CU Anschutz.
+
+calibrate_kebe.R - extension of KPJ's entropy balancing functions for multiple samples case.
+
