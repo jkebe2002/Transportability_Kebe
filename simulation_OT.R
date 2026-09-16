@@ -1,5 +1,22 @@
- 
+## Necessary libraries
+library('actuar') # For invgamma
+library('copula') # For copula functions
+library('dplyr')  # Piping function
+library(causalOT)
+library(expm)
 source("optimal_transport_fns.R")
+
+#results df
+results <- data.frame(
+  run = integer(),
+  t = numeric(),
+  ESS_opt = numeric(),
+  ESS_cot = numeric(),
+  bures_t_0 = numeric(),
+  bures_t_1 = numeric(),
+  bures_t_mid = numeric(),
+  Bindex_t = numeric()
+)
 
 for (i in 1:100)
 {
@@ -43,7 +60,7 @@ for (i in 1:100)
     St <- geodesic_step(S1,S0,t)
     #interpolated means
     means_t <- (1-t)*means_1 + t*means_0
-    
+    Rt <- cor_from_cov(St)
     dist_t <- create_multivariate_dist(
       Rt,
       list("norm", list(mean = means_t[1], sd = St[1,1])),
@@ -53,10 +70,14 @@ for (i in 1:100)
       list("norm", list(mean = means_t[5], sd = St[5,5]))
     )
     
-    n_t <- (1-t)*n_1 + t*n_0
+    n_t <- round((1-t)*n_1 + t*n_0)
     
     #generate synthetic sample
-    synth_samp_t <- generate_sample(n_t, dist_t, binomial_vectors = binomial_columns)
+    synth_samp_t <- generate_sample(n_t, dist_t, binomial_vectors = binomial_columns,
+                                    props = list(
+                                      list("norm", list(mean = means_t[2], sd = St[2,2])),
+                                      list("norm", list(mean = means_t[3], sd = St[3,3]))
+                                    ))
     
     #transport to df0
     df_0t <- combine_pops(synth_samp_t, df0)
@@ -71,11 +92,21 @@ for (i in 1:100)
     }, error = function(e) {
       ESS_opt <- 0
     })
-  
-    ESS(get.w(opt_wt))
     
     #call COT weight on group var
-    ESS(weights)
+    z <- df_0t$group
+    x <- as.matrix(df_0t[, c("var1", "var2", "var3", "var4", "var5")])
+    weights <- calc_weight(
+      x = x,
+      z = z,
+      method = "COT",
+      estimand = "ATE",
+      options = list(
+        lambda.bootstrap = Inf,
+        nboot = 1000L
+      )
+    )
+    ESS_cot <- ESS(weights)
     
     #bures distance
     bures_t_0 <-   bures_dist(St,  S0)
@@ -93,8 +124,8 @@ for (i in 1:100)
     logits <- predict(fit, type = "link")
     
     # separate by group
-    logits_0 <- logits[df$group == 0]
-    logits_1 <- logits[df$group == 1]
+    logits_0 <- logits[df_0t$group == 0]
+    logits_1 <- logits[df_0t$group == 1]
     
     Bindex_t <- Bindex(logits_0, logits_1)
     
@@ -125,6 +156,12 @@ Bindex <- function(dat1B,dat2B) {
     sqrt(kg(x,dat1B)*kg(x,dat2B)),-Inf,Inf)$value))
 }
 
+# Correlation matrix from covariance matrix
+cor_from_cov <- function(Sigma) {
+  D_inv <- diag(1 / sqrt(diag(Sigma)))
+  R <- D_inv %*% Sigma %*% D_inv
+  return(R)
+}
 # geodesic transporting V to U at time t
 geodesic_step <- function(V,U,t){
   #identity 
@@ -142,7 +179,7 @@ bures_dist <- function(A,B) {
   trace_A <- sum(diag(A))
   trace_B <- sum(diag(B))
   C <- sqrtm(A) %*% B %*% sqrtm(A)
-  d <- sqrtm(trace_A+trace_B-2*sqrt(sum(diag(C))))
+  d <- sqrt(trace_A+trace_B-2*sqrt(sum(diag(C))))
   return(d)
 }
 
