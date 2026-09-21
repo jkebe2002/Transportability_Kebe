@@ -2,3 +2,22 @@ Code for transportability projects related to Jacob Kebe's work at CU Anschutz.
 
 calibrate_kebe.R - extension of KPJ's entropy balancing functions for multiple samples case.
 
+optimal_transport_fns.R - functions for computing geodesics, W2 distance, etc. between two joint distributions
+simulation_OT.R - simulation to test "finding populations along the way" idea
+- check generalizability index, W2 distance, COT weight ESS, EB weight ESS along the way
+
+
+In the simulation, for each run (n_iter = 100), we create 5 variables, 
+In the first dataset, distributed N(0,1), Bern(.3), Bern(.2), N(1,5^2), N(10,10^2).
+In the second dataset, distributed N(0.5,1), Bern(.7), Bern(.6), N(5,5^2), N(15,10^2).
+
+These are designed to have low overlap.
+We then create a third dataset, with half its rows randomly sampled from the first dataset and half from the second.
+Now we have a population "along the way" between the two.
+
+Then using the covariance matrices from datasets 1 and 2, the mean structures, and the label for which are binomial,
+we can compute synthetic populations using a Wang style distribution generation and sampling step. We compute these synthetic populations along the geodesic from 1 to 2.
+We sequence from t=0 to t=1 in increments of .01, and at each step along the geodesic, we fit weights using Causal OT and optweight and record the ESS.
+We also compute the Bures distance between synthetic population and populations 1,2 and the midpoint population. We also check the generalizability index
+derived by Tipton, between the synthetic population and the population we are transporting to.
+

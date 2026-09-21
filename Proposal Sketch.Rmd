@@ -1,0 +1,18 @@
+---
+title: "Proposal Sketch"
+output: html_document
+---
+
+The idea is to use an optimal transport framework for transportability problems.
+The first implementation revolves around creating synthetic populations along the way between the source population $S_1$ and the target population $S_0$. This can be done using geodesics from the covariance matrices between the two populations, weighting their mean structures, and taking into account which variables are binary. A simple case assumes that continuous variables are Gaussian. 
+
+If we can accurately capture hypothetical populations along the path between our target and source, we can ask questions such as \
+- when do positivity assumptions start to become violated? \
+- what would a gradient of treatment effects look like along the path between the populations? \
+
+An extension could include more generalizeable copulas for reconstructing the multivariate distribution.
+
+The next implementation revolves around creating a synthetic population from multiple populations using fixed point iterations to find the barycenter of the covariance matrices. Questions that could be interesting include \
+- could a synthetic population based on the barycentre between multiple populations recover a more generalizable result than transporting to one population at a time? \
+- Could we use the barycentre idea to take data from populations we have ILD for, and draw some inference about another population for which we only have summary-level information?
+
