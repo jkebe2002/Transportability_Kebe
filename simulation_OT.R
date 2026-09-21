@@ -7,19 +7,22 @@ library(expm)
 source("optimal_transport_fns.R")
 
 #results df
+t_grid <- seq(0, 1, .1)
+
 results <- data.frame(
-  run = integer(),
-  t = numeric(),
-  ESS_opt = numeric(),
-  ESS_cot = numeric(),
-  bures_t_0 = numeric(),
-  bures_t_1 = numeric(),
-  bures_t_mid = numeric(),
-  Bindex_t = numeric()
+  run = rep(1:100, each = length(t_grid)),
+  t = rep(t_grid, times = 100),
+  ESS_opt = NA_real_,
+  ESS_cot = NA_real_,
+  bures_t_0 = NA_real_,
+  bures_t_1 = NA_real_,
+  bures_t_mid = NA_real_,
+  Bindex_t = NA_real_
 )
 
 for (i in 1:100)
 {
+  #print(i)
   #Generate two Multivariate distribuitions
     #case: correlations have opposite sign
     #case: correlations are weaker
@@ -53,9 +56,9 @@ for (i in 1:100)
   Smid <- cov(df_mid)
   
   
-  for (i in seq(0,1,.01)) {
+  for (t in seq(0,1,.1)) {
     #create synthetic population using correlation structures along the geodesic:
-    
+    #print(t)
     #construct interpolated covariance
     St <- geodesic_step(S1,S0,t)
     #interpolated means
@@ -63,11 +66,11 @@ for (i in 1:100)
     Rt <- cor_from_cov(St)
     dist_t <- create_multivariate_dist(
       Rt,
-      list("norm", list(mean = means_t[1], sd = St[1,1])),
-      list("norm", list(mean = means_t[2], sd = St[2,2])),
-      list("norm", list(mean = means_t[3], sd = St[3,3])),
-      list("norm", list(mean = means_t[4], sd = St[4,4])),
-      list("norm", list(mean = means_t[5], sd = St[5,5]))
+      list("norm", list(mean = means_t[1], sd = sqrt(St[1,1]))),
+      list("norm", list(mean = means_t[2], sd = sqrt(St[2,2]))),
+      list("norm", list(mean = means_t[3], sd = sqrt(St[3,3]))),
+      list("norm", list(mean = means_t[4], sd = sqrt(St[4,4]))),
+      list("norm", list(mean = means_t[5], sd = sqrt(St[5,5])))
     )
     
     n_t <- round((1-t)*n_1 + t*n_0)
@@ -75,38 +78,38 @@ for (i in 1:100)
     #generate synthetic sample
     synth_samp_t <- generate_sample(n_t, dist_t, binomial_vectors = binomial_columns,
                                     props = list(
-                                      list("norm", list(mean = means_t[2], sd = St[2,2])),
-                                      list("norm", list(mean = means_t[3], sd = St[3,3]))
+                                      list("norm", list(mean = means_t[2], sd = sqrt(St[2,2]))),
+                                      list("norm", list(mean = means_t[3], sd = sqrt(St[3,3])))
                                     ))
     
     #transport to df0
     df_0t <- combine_pops(synth_samp_t, df0)
     
     # call weightit on group var
-    tryCatch({
-      opt_w <- weightit(group ~ var1 + var2 + var3 + var4 + var5, data = df_0t, focal = 0,  
-                        method = "optweight", estimand = "ATT", tols = 0.1)
-     ESS_opt <- ESS(get.w(opt_wt))
-    }, warning = function(w) {
-    ESS_opt <- 0
-    }, error = function(e) {
-      ESS_opt <- 0
-    })
-    
-    #call COT weight on group var
-    z <- df_0t$group
-    x <- as.matrix(df_0t[, c("var1", "var2", "var3", "var4", "var5")])
-    weights <- calc_weight(
-      x = x,
-      z = z,
-      method = "COT",
-      estimand = "ATE",
-      options = list(
-        lambda.bootstrap = Inf,
-        nboot = 1000L
-      )
-    )
-    ESS_cot <- ESS(weights)
+    # tryCatch({
+    #   opt_w <- weightit(group ~ var1 + var2 + var3 + var4 + var5, data = df_0t, focal = 0,  
+    #                     method = "optweight", estimand = "ATT", tols = 0.01)
+    #  ESS_opt <- ESS(get.w(opt_wt))
+    # }, warning = function(w) {
+    # ESS_opt <- 0
+    # }, error = function(e) {
+    #   ESS_opt <- 0
+    # })
+    # 
+    # #call COT weight on group var
+    # z <- df_0t$group
+    # x <- as.matrix(df_0t[, c("var1", "var2", "var3", "var4", "var5")])
+    # weights <- calc_weight(
+    #   x = x,
+    #   z = z,
+    #   method = "COT",
+    #   estimand = "ATE",
+    #   options = list(
+    #     lambda.bootstrap = Inf,
+    #     nboot = 1000L
+    #   )
+    # )
+    # ESS_cot <- ESS(weights)
     
     #bures distance
     bures_t_0 <-   bures_dist(St,  S0)
@@ -130,7 +133,29 @@ for (i in 1:100)
     Bindex_t <- Bindex(logits_0, logits_1)
     
     
+    idx <- (i - 1) * length(t_grid) + which(t_grid == t)
     
+    results[idx, c(
+      #"ESS_opt",
+      #"ESS_cot",
+      "bures_t_0",
+      "bures_t_1",
+      "bures_t_mid",
+      "Bindex_t"
+    )] <- c(
+      #ESS_opt,
+      #ESS_cot,
+      bures_t_0,
+      bures_t_1,
+      bures_t_mid,
+      Bindex_t
+    )
+    # cat(
+    #   "t =", t,
+    #   "val =", val,
+    #   "min eig St =", min(eigen(St, symmetric=TRUE)$values),
+    #   "\n"
+    # )
     
   }
 
@@ -175,15 +200,21 @@ geodesic_step <- function(V,U,t){
 }
 
 #compute bures distance metric
-bures_dist <- function(A,B) {
+bures_dist <- function(A, B) {
+  
   trace_A <- sum(diag(A))
   trace_B <- sum(diag(B))
+  
   C <- sqrtm(A) %*% B %*% sqrtm(A)
-  d <- sqrt(trace_A+trace_B-2*sqrt(sum(diag(C))))
-  return(d)
+  
+  eig <- Re(eigen(C, symmetric = TRUE)$values)
+  
+  eig[eig < 0] <- 0
+  
+  val <- trace_A + trace_B - 2 * sum(sqrt(eig))
+
+  sqrt(max(val, 0))
 }
-
-
 # Function to combine sample and population data
 combine_pops = function(pop, samp) {
   names(pop) = names(samp)
@@ -492,3 +523,30 @@ gen_data <- function(n_0, n_1, prob, sig2, rho = 0, scenario = c("baseline", "po
   return(out)
   
 }
+
+
+
+
+
+
+
+
+
+# what is the average t at which B index surpasses .8?
+
+results |> group_by(run) |> mutate(
+  Bindex_high = if_else(Bindex_t >= .8, 1,0)) |>
+    filter(Bindex_high == 1) |> mean(t)
+
+results |>
+  filter(Bindex_t >= 0.8) |>
+  group_by(run) |>
+  summarise(
+    t_cross = min(t),
+    .groups = "drop"
+  ) |>
+  summarise(
+    mean_t_cross = mean(t_cross)
+  )
+
+
