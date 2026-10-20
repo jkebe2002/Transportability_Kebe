@@ -22,7 +22,7 @@ results <- data.frame(
 
 for (i in 1:100)
 {
-  #print(i)
+  print(i)
   #Generate two Multivariate distribuitions
     #case: correlations have opposite sign
     #case: correlations are weaker
@@ -96,20 +96,20 @@ for (i in 1:100)
     #   ESS_opt <- 0
     # })
     # 
-    # #call COT weight on group var
-    # z <- df_0t$group
-    # x <- as.matrix(df_0t[, c("var1", "var2", "var3", "var4", "var5")])
-    # weights <- calc_weight(
-    #   x = x,
-    #   z = z,
-    #   method = "COT",
-    #   estimand = "ATE",
-    #   options = list(
-    #     lambda.bootstrap = Inf,
-    #     nboot = 1000L
-    #   )
-    # )
-    # ESS_cot <- ESS(weights)
+    #call COT weight on group var
+    z <- df_0t$group
+    x <- as.matrix(df_0t[, c("var1", "var2", "var3", "var4", "var5")])
+    weights <- calc_weight(
+      x = x,
+      z = z,
+      method = "COT",
+      estimand = "ATE",
+      options = list(
+        lambda.bootstrap = Inf,
+        nboot = 1000L
+      )
+    )
+    ESS_cot <- ESS(weights)
     
     #bures distance
     bures_t_0 <-   bures_dist(St,  S0)
@@ -548,5 +548,79 @@ results |>
   summarise(
     mean_t_cross = mean(t_cross)
   )
+
+
+# Plots
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+
+# Calculate means and standard errors by t
+plot_df <- results %>%
+  group_by(t) %>%
+  summarise(
+    mean_bures_t_0 = mean(bures_t_0, na.rm = TRUE),
+    se_bures_t_0   = sd(bures_t_0, na.rm = TRUE) / sqrt(sum(!is.na(bures_t_0))),
+    
+    mean_bures_t_1 = mean(bures_t_1, na.rm = TRUE),
+    se_bures_t_1   = sd(bures_t_1, na.rm = TRUE) / sqrt(sum(!is.na(bures_t_1))),
+    
+    mean_Bindex = mean(Bindex_t, na.rm = TRUE),
+    se_Bindex   = sd(Bindex_t, na.rm = TRUE) / sqrt(sum(!is.na(Bindex))),
+    
+    .groups = "drop"
+  )
+
+# Bures distance plot
+p1 <- ggplot(plot_df, aes(x = t)) +
+  geom_line(aes(y = mean_bures_t_0, color = "bures_t_0"), linewidth = 1) +
+  geom_point(aes(y = mean_bures_t_0, color = "bures_t_0")) +
+  geom_errorbar(
+    aes(
+      ymin = mean_bures_t_0 - se_bures_t_0,
+      ymax = mean_bures_t_0 + se_bures_t_0,
+      color = "bures_t_0"
+    ),
+    width = 0.02
+  ) +
+  geom_line(aes(y = mean_bures_t_1, color = "bures_t_1"), linewidth = 1) +
+  geom_point(aes(y = mean_bures_t_1, color = "bures_t_1")) +
+  geom_errorbar(
+    aes(
+      ymin = mean_bures_t_1 - se_bures_t_1,
+      ymax = mean_bures_t_1 + se_bures_t_1,
+      color = "bures_t_1"
+    ),
+    width = 0.02
+  ) +
+  labs(
+    title = "Mean Bures Distances Across t",
+    x = "t",
+    y = "Mean Bures Distance",
+    color = NULL
+  ) +
+  theme_minimal()
+
+# Bindex plot
+p2 <- ggplot(plot_df, aes(x = t, y = mean_Bindex)) +
+  geom_line(color = "darkgreen", linewidth = 1) +
+  geom_point(color = "darkgreen") +
+  geom_errorbar(
+    aes(
+      ymin = mean_Bindex - se_Bindex,
+      ymax = mean_Bindex + se_Bindex
+    ),
+    width = 0.02,
+    color = "darkgreen"
+  ) +
+  labs(
+    title = "Mean B-index Across t",
+    x = "t",
+    y = "Mean B-index"
+  ) +
+  theme_minimal()
+
+# Display stacked (or use p1 | p2 for side-by-side)
+p1 / p2
 
 

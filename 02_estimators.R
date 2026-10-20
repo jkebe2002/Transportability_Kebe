@@ -10,7 +10,7 @@ library(causalOT)
 dr_balance <- function(S, X, Z1, time1, event1, cuts,
                        method = c("optweight", "ebal", "super", "OT"),
                        sl.lib = c("SL.mean", "SL.glm"),
-                       tols = 0.05) {
+                       tols = 0.05, lambda = NULL) {
   print(method)
   
   method <- match.arg(method)
@@ -107,7 +107,7 @@ dr_balance <- function(S, X, Z1, time1, event1, cuts,
     weights <- calc_weight(x = Xmat, z = S, 
                            method = "COT",
                            estimand = "ATC", 
-                           options = list(lambda = 100)
+                           options = list(lambda = lambda)
     )
   #   m_source <- causalOT::Measure(x = as.matrix(X[S==1, ]),adapt = "weights" )
   #   m_target <- causalOT::Measure(x = as.matrix(X[S==0, ]))

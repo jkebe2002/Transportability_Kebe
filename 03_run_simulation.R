@@ -27,7 +27,65 @@ n_sim <- 500
 n_total <- 1000
 cuts <- c(1, 2, 3, 4, 5, 6)
 
-set.seed(42)
+set.seed(420)
+
+summarize_data <- function(scenario_name, method, cuts = cuts, fit, truths = truths, lambda = NULL) {
+  estimates[i, ] <- fit$estimate    
+  variances[i, ] <- fit$variance
+  if (method == "EB") {
+    if (!is.null(fit$wfit)) {
+      weights_list[[i]] <- fit$wfit$weights[S == 1]
+    }}
+  
+  if (method != "EB" & !is.null(fit_ot$wfit)) {
+    weights_list[[i]] <- fit$wfit$weights
+  }
+  failure_rate <- colMeans(is.na(estimates))
+  
+  outlier <- abs(estimates) > 10 | variances > 100
+  estimates[outlier] <- NA
+  variances[outlier] <- NA
+  
+  avg_truth <- colMeans(truths, na.rm = TRUE)
+  bias <- colMeans(estimates, na.rm = TRUE) - avg_truth
+  var <- colMeans(estimates, na.rm = TRUE) - avg_truth
+  rmse <- sqrt(colMeans((estimates - truths)^2, na.rm = TRUE))
+  
+  lo <- estimates - 1.96 * sqrt(variances)
+  hi <- estimates + 1.96 * sqrt(variances)
+  truth_mat <- matrix(rep(avg_truth, n_sim), byrow = TRUE, nrow = n_sim)
+  coverage <- colMeans(truth_mat >= lo & truth_mat <= hi, na.rm = TRUE)
+  outlier_rate <- colMeans(outlier)
+  
+  rep_idx <- which(!vapply(weights_list, is.null, logical(1)))[1]
+  
+  weight_df <- 
+    if (length(rep_idx) && !is.na(rep_idx)) {
+      data.frame(
+        scenario = scenario_name,
+        method = method,
+        w = weights_list[[rep_idx]]
+      )
+    } else {
+      NULL
+    }
+  
+  return(list(summary = data.frame(
+    scenario = scenario_name,
+    time = cuts,
+    method = method,
+    truth = avg_truth,
+    bias = bias,
+    rmse = rmse,
+    coverage = coverage,
+    outlier_rate = outlier_rate,
+    failure_rate = failure_rate
+    #outliers = outlier_eb
+  ), weights = weights_df))
+  
+  
+}
+
 
 run_it <- function(scenario_name) {
   # MEASURE RUNTIME
@@ -73,9 +131,9 @@ run_it <- function(scenario_name) {
         )
       }
     )
-    fit_ot <- tryCatch(
+    fit_ot_0 <- tryCatch(
       dr_balance(S = S, X = W, Z1 = Z1, time1 = t1, event1 = e1,
-                 cuts = cuts, method = "OT", tols = 0.05),
+                 cuts = cuts, method = "OT", tols = 0.05, lambda = 0),
       error = function(e) {
         print(e)
         list(estimate = rep(NA, length(cuts)),
@@ -84,46 +142,63 @@ run_it <- function(scenario_name) {
       }
     )
     
+    fit_ot_1 <- tryCatch(
+      dr_balance(S = S, X = W, Z1 = Z1, time1 = t1, event1 = e1,
+                 cuts = cuts, method = "OT", tols = 0.05, lambda = 1),
+      error = function(e) {
+        print(e)
+        list(estimate = rep(NA, length(cuts)),
+             variance = rep(NA, length(cuts)),
+             wfit = NULL)
+      }
+    )
     
-    estimates_eb[i, ] <- fit_eb$estimate
-    variances_eb[i, ] <- fit_eb$variance
+    fit_ot_10 <- tryCatch(
+      dr_balance(S = S, X = W, Z1 = Z1, time1 = t1, event1 = e1,
+                 cuts = cuts, method = "OT", tols = 0.05, lambda = 10),
+      error = function(e) {
+        print(e)
+        list(estimate = rep(NA, length(cuts)),
+             variance = rep(NA, length(cuts)),
+             wfit = NULL)
+      }
+    )
+    
+    fit_ot_100 <- tryCatch(
+      dr_balance(S = S, X = W, Z1 = Z1, time1 = t1, event1 = e1,
+                 cuts = cuts, method = "OT", tols = 0.05, lambda = 100),
+      error = function(e) {
+        print(e)
+        list(estimate = rep(NA, length(cuts)),
+             variance = rep(NA, length(cuts)),
+             wfit = NULL)
+      }
+    )
+    
+    fit_ot_1000 <- tryCatch(
+      dr_balance(S = S, X = W, Z1 = Z1, time1 = t1, event1 = e1,
+                 cuts = cuts, method = "OT", tols = 0.05, lambda = 1000),
+      error = function(e) {
+        print(e)
+        list(estimate = rep(NA, length(cuts)),
+             variance = rep(NA, length(cuts)),
+             wfit = NULL)
+      }
+    )
+    
     truths[i, ] <- sim_data$truth$diff
     
-    estimates_ot[i, ] <- fit_ot$estimate
-    variances_ot[i, ] <- fit_ot$variance
+    
+  
+  
 
-    if (!is.null(fit_eb$wfit)) {
-      weights_list_eb[[i]] <- fit_eb$wfit$weights[S == 1]
-    }
-    if (!is.null(fit_ot$wfit)) {
-      weights_list_ot[[i]] <- fit_ot$wfit$weights
-    }
-    
-    
-  }
-  
-  
-  failure_rate_eb <- colMeans(is.na(estimates_eb))
-  failure_rate_ot <- colMeans(is.na(estimates_ot))
-  
   # Flag extreme outliers (numerical blow-ups) as NA
-  outlier_eb <- abs(estimates_eb) > 10 | variances_eb > 100
   
-  estimates_eb[outlier_eb] <- NA
-  variances_eb[outlier_eb] <- NA
-  
-  outlier_ot <- abs(estimates_ot) > 10 | variances_ot > 100
-  estimates_ot[outlier_ot] <- NA
-  variances_ot[outlier_ot] <- NA
-  
-  avg_truth <- colMeans(truths, na.rm = TRUE)
-  bias_eb <- colMeans(estimates_eb, na.rm = TRUE) - avg_truth
-  rmse_eb <- sqrt(colMeans((estimates_eb - truths)^2, na.rm = TRUE))
 
-  lo_eb <- estimates_eb - 1.96 * sqrt(variances_eb)
-  hi_eb <- estimates_eb + 1.96 * sqrt(variances_eb)
-  truth_mat <- matrix(rep(avg_truth, n_sim), byrow = TRUE, nrow = n_sim)
-  coverage_eb <- colMeans(truth_mat >= lo_eb & truth_mat <= hi_eb, na.rm = TRUE)
+  
+ 
+  
+  
   
   bias_ot <- colMeans(estimates_ot, na.rm = TRUE) - avg_truth
   rmse_ot <- sqrt(colMeans((estimates_ot - truths)^2, na.rm = TRUE))
@@ -132,62 +207,39 @@ run_it <- function(scenario_name) {
   hi_ot <- estimates_ot + 1.96 * sqrt(variances_ot)
   coverage_ot <- colMeans(truth_mat >= lo_ot & truth_mat <= hi_ot, na.rm = TRUE)
   
-  outlier_rate_eb <- colMeans(outlier_eb)
   outlier_rate_ot <- colMeans(outlier_ot)
   
 
   summary_df <- rbind(
-    data.frame(
-      scenario = scenario_name,
-      time = cuts,
-      method = "EB",
-      truth = avg_truth,
-      bias = bias_eb,
-      rmse = rmse_eb,
-      coverage = coverage_eb,
-      outlier_rate = outlier_rate_eb,
-      failure_rate = failure_rate_eb
-      #outliers = outlier_eb
-      
+    # (scenario_name, method, cuts = cuts, fit, truths = truths) 
+    summarize_data(scenario_name = scenario_name,
+                   method = "EB",
+                   fit = fit_eb
+                   ),
+    
+    summarize_data(scenario_name = scenario_name,
+                   method = "OT",
+                   fit = fit_ot_0, lambda = 0
     ),
-    data.frame(
-      scenario = scenario_name,
-      time = cuts,
-      method = "OT",
-      truth = avg_truth,
-      bias = bias_ot,
-      rmse = rmse_ot,
-      coverage = coverage_ot,
-      outlier_rate = outlier_rate_ot,
-      failure_rate = failure_rate_ot
-      #outliers = outlier_ot
+    summarize_data(scenario_name = scenario_name,
+                   method = "OT",
+                   fit = fit_ot_1, lambda = 1
+    ),
+    summarize_data(scenario_name = scenario_name,
+                   method = "OT",
+                   fit = fit_ot_10, lambda = 10
+    ),
+    summarize_data(scenario_name = scenario_name,
+                   method = "OT",
+                   fit = fit_ot_100, lambda = 100
+    ),
+    summarize_data(scenario_name = scenario_name,
+                   method = "OT",
+                   fit = fit_ot_1000, lambda = 1000
     )
   )
   
-  rep_idx_eb <- which(!vapply(weights_list_eb, is.null, logical(1)))[1]
-  rep_idx_ot <- which(!vapply(weights_list_ot, is.null, logical(1)))[1]
-  
-  weight_df <- rbind(
-    if (length(rep_idx_eb) && !is.na(rep_idx_eb)) {
-      data.frame(
-        scenario = scenario_name,
-        method = "EB",
-        w = weights_list_eb[[rep_idx_eb]]
-      )
-    } else {
-      NULL
-    },
-    
-    if (length(rep_idx_ot) && !is.na(rep_idx_ot)) {
-      data.frame(
-        scenario = scenario_name,
-        method = "OT",
-        w = weights_list_ot[[rep_idx_ot]]
-      )
-    } else {
-      NULL
-    }
-  )
+
   list(summary = summary_df, weights = weight_df)
   
 }
@@ -302,7 +354,7 @@ p_bias <- ggplot(
 
 # RMSE plot
 p_rmse <- ggplot(
-  final_results,
+  final_results_no_outlier_filter,
   aes(x = time, y = rmse, color = method, group = method)
 ) +
   geom_line(linewidth = 1) +
