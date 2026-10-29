@@ -9,10 +9,12 @@ The first implementation revolves around creating synthetic populations along th
 If we can accurately capture hypothetical populations along the path between our target and source, we can ask questions such as \
 - when do positivity assumptions start to become violated? \
 - what would a gradient of treatment effects look like along the path between the populations? \
+- if you want to transport trial results to a population, but there is poor overlap, how far along the path is your population generalizable? An example could be transporting SUSTAIN to all of Marketscan's T2D patients. Is there a population along the way that is similar to the trial eligible population we have found?
+
+
 
 An extension could include more generalizeable copulas for reconstructing the multivariate distribution.
 
 The next implementation revolves around creating a synthetic population from multiple populations using fixed point iterations to find the barycenter of the covariance matrices. Questions that could be interesting include \
 - could a synthetic population based on the barycentre between multiple populations recover a more generalizable result than transporting to one population at a time? \
 - Could we use the barycentre idea to take data from populations we have ILD for, and draw some inference about another population for which we only have summary-level information?
-

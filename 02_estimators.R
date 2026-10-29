@@ -81,7 +81,7 @@ dr_balance <- function(S, X, Z1, time1, event1, cuts,
       eic <- ((w1 - w0) * (psi - mu[, 1])) / mean(S == 1) +
         ((S == 0) * (mu[, 3] - mu[, 2] - aug_est)) / mean(S == 0)
       
-      list(estimate = aug_est, variance = var(eic) / n)
+      list(estimate = aug_est, variance = var(eic) / n )
       
    
       
@@ -92,12 +92,15 @@ dr_balance <- function(S, X, Z1, time1, event1, cuts,
     variance <- vapply(pseudo.out, `[[`, numeric(1), "variance")
     names(estimate) <- names(variance) <- cuts
     print("line 90")
-    
+    w_S1 <- samp[S == 1] 
+    ess  <- sum(w_S1)^2 / sum(w_S1^2)
+    kish_ess <- function(w) sum(w)^2 / sum(w^2)
     return(
       list(
         estimate = estimate,
         variance = variance,
-        wfit = wfit
+        wfit = list(weights = samp, ESS = kish_ess(samp[S == 1])),
+        ESS = ess
       )
     )  }
   if (method == "OT") {
@@ -109,45 +112,6 @@ dr_balance <- function(S, X, Z1, time1, event1, cuts,
                            estimand = "ATC", 
                            options = list(lambda = lambda)
     )
-  #   m_source <- causalOT::Measure(x = as.matrix(X[S==1, ]),adapt = "weights" )
-  #   m_target <- causalOT::Measure(x = as.matrix(X[S==0, ]))
-  #   
-  #   otp <- causalOT::OTProblem(m_source, m_target)
-  #   
-  #   #set args
-  #   otp$setup_arguments(
-  #     lambda = 1, # penalty values of the optimal transport (OT) distances to try
-  #     delta = 0, # constraint values to try for balancing functinos
-  #     grid.length = 7L, # number of values of lambda and delta to try
-  #     # if none are provided
-  #     cost.function = NULL, # the ground cost to use between covariates
-  #     # default is the Euclidean distance
-  #     p = 2, # power to raise the cost by
-  #     cost.online = "auto", #Should cost be calculated "online" or "tensorized" (stored in memory). "auto" will try to decide for you
-  #     debias = TRUE, # use Sinkhorn divergences (debias = TRUE), i.e. debiased Sinkhorn distances, 
-  #     # or use the Sinkhorn distances (debias = FALSE)
-  #     diameter = NULL, # the diameter of the covariate space if known
-  #     ot_niter = 1000L, # the number of iterations to run when solving OT distances
-  #     ot_tol = 0.001 # the tolerance for convergance of OT distances
-  #   )
-  #   #solve otp prob
-  #   otp$solve(
-  #     niter = 1000L, # maximum number of iterations
-  #     tol = 1e-5, # tolerance for convergence
-  #     optimizer = "torch", # which optimizer to use "torch" or "frank-wolfe"
-  #     torch_optim = torch::optim_lbfgs, # torch optimizer to use if required
-  #     torch_scheduler = torch::lr_reduce_on_plateau, # torch scheduler to use if required
-  #     torch_args = list(line_search_fn = "strong_wolfe"), # args passed to the torch functions,
-  #     osqp_args = NULL, #arguments passed to the osqp solver used for "frank-wolfe" and balance functions
-  #     quick.balance.function = TRUE # if balance functions are also present, should an approximate value of the hyperparameter "delta" be found first
-  #   )
-  #   otp$choose_hyperparameters(
-  #     n_boot_lambda = 100L, #Number of bootstrap iterations to choose lambda
-  #     n_boot_delta = 1000L, #Number of bootstrap iterations to choose delta
-  #     lambda_bootstrap = Inf # penalty parameter to use for OT distances
-  #   )
-  #   
-  # print(otp$selected_lambda)
     
  
     #sum to group size 
@@ -189,11 +153,16 @@ dr_balance <- function(S, X, Z1, time1, event1, cuts,
     variance <- vapply(pseudo.out, `[[`, numeric(1), "variance")
     names(estimate) <- names(variance) <- cuts
     
+    w1 <- as.numeric(weights@w1)
+    ess <- sum(w1)^2 / sum(w1^2)
+    
     return(
       list(
         estimate = estimate,
         variance = variance,
-        wfit = list(weights = as.numeric(weights@w1))
+        wfit = list(weights = w1, 
+                    ESS = ess
+                      )
       )
     )  }
 }
